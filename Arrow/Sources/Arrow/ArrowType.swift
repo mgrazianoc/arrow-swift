@@ -122,11 +122,20 @@ public class ArrowTypeTime64: ArrowType {
     }
 }
 
-public class ArrowNestedType: ArrowType {
+public class ArrowTypeStruct: ArrowType {
     let fields: [ArrowField]
     public init(_ info: ArrowType.Info, fields: [ArrowField]) {
         self.fields = fields
         super.init(info)
+    }
+}
+
+public class ArrowTypeList: ArrowType {
+    let elementType: ArrowType
+
+    public init(_ elementType: ArrowType) {
+        self.elementType = elementType
+        super.init(ArrowType.ArrowList)
     }
 }
 
@@ -151,6 +160,7 @@ public class ArrowType {
     public static let ArrowTime32 = Info.timeInfo(ArrowTypeId.time32)
     public static let ArrowTime64 = Info.timeInfo(ArrowTypeId.time64)
     public static let ArrowStruct = Info.complexInfo(ArrowTypeId.strct)
+    public static let ArrowList = Info.complexInfo(ArrowTypeId.list)
 
     public init(_ info: ArrowType.Info) {
         self.info = info
@@ -274,7 +284,7 @@ public class ArrowType {
             return MemoryLayout<Int8>.stride
         case .string:
             return MemoryLayout<Int8>.stride
-        case .strct:
+        case .strct, .list:
             return 0
         default:
             fatalError("Stride requested for unknown type: \(self)")
@@ -324,6 +334,20 @@ public class ArrowType {
                 return "z"
             case ArrowTypeId.string:
                 return "u"
+            case ArrowTypeId.strct:
+                if let structType = self as? ArrowTypeStruct {
+                    var format = "+s"
+                    for field in structType.fields {
+                        format += try field.type.cDataFormatId
+                    }
+                    return format
+                }
+                throw ArrowError.invalid("Invalid struct type")
+            case ArrowTypeId.list:
+                if let listType = self as? ArrowTypeList {
+                    return "+l" + (try listType.elementType.cDataFormatId)
+                }
+                throw ArrowError.invalid("Invalid list type")
             default:
                 throw ArrowError.notImplemented
             }
